@@ -28,13 +28,14 @@ def linear(inputs, output_size, bias, concat=True, dtype=None, scope=None):
             inputs = [inputs]
 
         input_size = [item.get_shape()[-1].value for item in inputs]
-
         if len(inputs) != len(input_size):
             raise RuntimeError("inputs and input_size unmatched!")
 
         output_shape = tf.concat([tf.shape(inputs[0])[:-1], [output_size]],
                                  axis=0)
         # Flatten to 2D
+        for inp in inputs:
+            tf.reshape(inp, [-1, inp.shape[-1].value])
         inputs = [tf.reshape(inp, [-1, inp.shape[-1].value]) for inp in inputs]
 
         results = []

@@ -1,0 +1,2 @@
+export PYTHONPATH="${PYTHONPATH}:/Users/wudi39/github/robust-NLU/THUMT"
+python ./thumt/bin/trainer.py --input ../data/snips/train/data.query ../data/snips/train/data.slot --vocabulary ../data/snips/vocab.q.txt ../data/snips/vocab.s.txt --model transformer --validation ../data/snips/valid/data.query --references ../data/snips/valid/data.slot --parameters=batch_size=625,device_list=[0],update_cycle=4,train_steps=200000

@@ -169,6 +169,7 @@ def encoding_graph(features, mode, params):
     src_mask = tf.sequence_mask(src_len,
                                 maxlen=tf.shape(features["source"])[1],
                                 dtype=dtype or tf.float32)
+    # src_mask = tf.Print(src_mask, [src_mask], "src_mask: ", summarize=100)
 
     svocab = params.vocabulary["source"]
     src_vocab_size = len(svocab)
@@ -201,6 +202,12 @@ def encoding_graph(features, mode, params):
     if params.residual_dropout:
         keep_prob = 1.0 - params.residual_dropout
         encoder_input = tf.nn.dropout(encoder_input, keep_prob)
+
+    # print(encoder_input)    # [?, ?, 512]
+    # print(enc_attn_bias)    # [?, 1, 1, ?]
+    # print(src_mask)         # [?, ?]
+    # encoder_input = tf.Print(encoder_input, [encoder_input], "encoder_input: ", summarize=100)
+    # enc_attn_bias = tf.Print(enc_attn_bias, [enc_attn_bias], "enc_attn_bias: ", summarize=100)
 
     encoder_output = transformer_encoder(encoder_input, enc_attn_bias, params)
 
@@ -404,8 +411,8 @@ class Transformer(NMTModel):
             eos="<eos>",
             unk="<unk>",
             append_eos=False,
-            hidden_size=512,
-            filter_size=2048,
+            hidden_size=128,
+            filter_size=128,
             num_heads=8,
             num_encoder_layers=6,
             num_decoder_layers=6,
