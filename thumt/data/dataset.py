@@ -94,8 +94,9 @@ def get_training_input(filenames, params):
     with tf.device("/cpu:0"):
         src_dataset = tf.data.TextLineDataset(filenames[0])
         tgt_dataset = tf.data.TextLineDataset(filenames[1])
+        domain_dataset = tf.data.TextLineDataset(filenames[2])
 
-        dataset = tf.data.Dataset.zip((src_dataset, tgt_dataset))
+        dataset = tf.data.Dataset.zip((src_dataset, tgt_dataset, domain_dataset))
 
         if distribute.is_distributed_training_mode():
             dataset = dataset.shard(distribute.size(), distribute.rank())
@@ -105,29 +106,32 @@ def get_training_input(filenames, params):
 
         # Split string
         dataset = dataset.map(
-            lambda src, tgt: (
+            lambda src, tgt, dom: (
                 tf.string_split([src]).values,
-                tf.string_split([tgt]).values
+                tf.string_split([tgt]).values,
+                tf.strings.to_number(dom, out_type=tf.int32, name="domain_label")
             ),
             num_parallel_calls=params.num_threads
         )
 
         # Append <eos> symbol
         dataset = dataset.map(
-            lambda src, tgt: (
+            lambda src, tgt, dom: (
                 tf.concat([src, [tf.constant(params.eos)]], axis=0),
-                tf.concat([tgt, [tf.constant(params.eos)]], axis=0)
+                tf.concat([tgt, [tf.constant(params.eos)]], axis=0),
+                dom
             ),
             num_parallel_calls=params.num_threads
         )
 
         # Convert to dictionary
         dataset = dataset.map(
-            lambda src, tgt: {
+            lambda src, tgt, dom: {
                 "source": src,
                 "target": tgt,
                 "source_length": tf.shape(src),
-                "target_length": tf.shape(tgt)
+                "target_length": tf.shape(tgt),
+                "domain_label": dom
             },
             num_parallel_calls=params.num_threads
         )
@@ -147,8 +151,8 @@ def get_training_input(filenames, params):
         )
 
         # String to index lookup
-        features["source"] = src_table.lookup(features["source"])
-        features["target"] = tgt_table.lookup(features["target"])
+        features["source"] = src_table.lookup(features["source"])   # [?, s_max_len]
+        features["target"] = tgt_table.lookup(features["target"])   # [?, t_max_len]
 
         # Batching
         features = batch_examples(features, params.batch_size,

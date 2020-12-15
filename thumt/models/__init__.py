@@ -10,6 +10,7 @@ import thumt.models.rnnsearch
 import thumt.models.rnnsearch_lrp
 import thumt.models.transformer
 import thumt.models.transformer_lrp
+import thumt.models.flip_gradient
 
 
 def get_model(name, lrp=False):

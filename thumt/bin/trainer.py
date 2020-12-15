@@ -30,7 +30,7 @@ def parse_args(args=None):
     )
 
     # input files
-    parser.add_argument("--input", type=str, nargs=2,
+    parser.add_argument("--input", type=str, nargs=3,
                         help="Path of source and target corpus")
     parser.add_argument("--record", type=str,
                         help="Path to tf.Record data")

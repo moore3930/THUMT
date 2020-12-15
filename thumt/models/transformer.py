@@ -13,6 +13,7 @@ import thumt.losses as losses
 import thumt.utils as utils
 
 from thumt.models.model import NMTModel
+from thumt.models.flip_gradient import flip_gradient
 
 
 def _layer_process(x, mode):
@@ -164,6 +165,7 @@ def encoding_graph(features, mode, params):
 
     dtype = tf.get_variable_scope().dtype
     hidden_size = params.hidden_size
+
     src_seq = features["source"]
     src_len = features["source_length"]
     src_mask = tf.sequence_mask(src_len,
@@ -222,6 +224,8 @@ def decoding_graph(features, state, mode, params):
         params.label_smoothing = 0.0
 
     dtype = tf.get_variable_scope().dtype
+
+    domain_label = features["domain_label"]
     tgt_seq = features["target"]
     src_len = features["source_length"]
     tgt_len = features["target_length"]
@@ -306,7 +310,9 @@ def decoding_graph(features, state, mode, params):
     )
     tgt_mask = tf.cast(tgt_mask, ce.dtype)
 
-    ce = tf.reshape(ce, tf.shape(tgt_seq))
+    ce = tf.reshape(ce, tf.shape(tgt_seq))                  # [?, max_len]
+
+    tgt_mask = tf.expand_dims(tf.cast(domain_label, dtype=tf.float32), 1) * tgt_mask
 
     if mode == "eval":
         return -tf.reduce_sum(ce * tgt_mask, axis=1)
@@ -316,14 +322,68 @@ def decoding_graph(features, state, mode, params):
     return loss
 
 
+def adversarial_graph(features, state, mode, params):
+    if mode != "train":
+        params.residual_dropout = 0.0
+        params.attention_dropout = 0.0
+        params.relu_dropout = 0.0
+        params.label_smoothing = 0.0
+
+    dtype = tf.get_variable_scope().dtype
+    hidden_size = params.hidden_size
+
+    domain_label = features["domain_label"]
+    src_len = features["source_length"]
+    src_mask = tf.sequence_mask(src_len,
+                                maxlen=tf.shape(features["source"])[1],
+                                dtype=dtype or tf.float32)
+
+    bias = tf.get_variable("adv_bias", [hidden_size])
+
+    inputs = state["encoder"]
+
+    # flip the gradient.
+    inputs = flip_gradient(inputs, 1.0)
+
+    if params.multiply_embedding_mode == "sqrt_depth":
+        inputs = inputs * (hidden_size ** 0.5)
+
+    inputs = inputs * tf.expand_dims(src_mask, -1)
+
+    encoder_input = tf.nn.bias_add(inputs, bias)
+    enc_attn_bias = layers.attention.attention_bias(src_mask, "masking", dtype=dtype)
+
+    if params.position_info_type == 'absolute':
+        encoder_input = layers.attention.add_timing_signal(encoder_input)
+
+    if params.residual_dropout:
+        keep_prob = 1.0 - params.residual_dropout
+        encoder_input = tf.nn.dropout(encoder_input, keep_prob)
+
+    encoder_output = transformer_encoder(encoder_input, enc_attn_bias, params)      # [?, max_len, dim]
+    domain_output, sentence_output = tf.split(encoder_output, [1, tf.shape(encoder_output)[1] - 1], 1)
+
+    # Domain Classification Loss
+    domain_output = _ffn_layer(domain_output, hidden_size, 2, scope="domain-cls")   # [?, 1, 2]
+    domain_output = tf.squeeze(domain_output)                                       # [?, 2]
+
+    crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=domain_label, logits=domain_output
+    )
+    domain_cls_loss = tf.reduce_mean(crossent)
+
+    return domain_cls_loss
+
+
 def model_graph(features, mode, params):
     encoder_output = encoding_graph(features, mode, params)
     state = {
         "encoder": encoder_output
     }
-    output = decoding_graph(features, state, mode, params)
+    s2s_loss = decoding_graph(features, state, mode, params)
+    adv_loss = adversarial_graph(features, state, mode, params)
 
-    return output
+    return s2s_loss + adv_loss
 
 
 class Transformer(NMTModel):
