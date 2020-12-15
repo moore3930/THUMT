@@ -383,7 +383,7 @@ def model_graph(features, mode, params):
     s2s_loss = decoding_graph(features, state, mode, params)
     adv_loss = adversarial_graph(features, state, mode, params)
 
-    return s2s_loss + adv_loss
+    return s2s_loss, adv_loss
 
 
 class Transformer(NMTModel):
@@ -403,8 +403,8 @@ class Transformer(NMTModel):
             with tf.variable_scope(self._scope, initializer=initializer,
                                    regularizer=regularizer, reuse=reuse,
                                    custom_getter=custom_getter, dtype=dtype):
-                loss = model_graph(features, "train", params)
-                return loss
+                s2s_loss, adv_loss = model_graph(features, "train", params)
+                return s2s_loss, adv_loss
 
         return training_fn
 

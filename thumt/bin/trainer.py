@@ -377,17 +377,22 @@ def main(args):
             features,
             params.device_list
         )
-        loss = tf.add_n(sharded_losses) / len(sharded_losses)
-        loss = loss + tf.losses.get_regularization_loss()
+        s2s_losses = [item[0] for item in sharded_losses]
+        adv_losses = [item[1] for item in sharded_losses]
+
+        s2s_loss = tf.add_n(s2s_losses) / len(s2s_losses)
+        adv_loss = tf.add_n(adv_losses) / len(adv_losses)
+        loss = s2s_loss + adv_loss + tf.losses.get_regularization_loss()
 
         if distribute.rank() == 0:
             print_variables()
 
-        learning_rate = get_learning_rate_decay(params.learning_rate,
-                                                global_step, params)
+        learning_rate = get_learning_rate_decay(params.learning_rate, global_step, params)
         learning_rate = tf.convert_to_tensor(learning_rate, dtype=tf.float32)
 
         tf.summary.scalar("loss", loss)
+        tf.summary.scalar("adv_loss", adv_loss)
+        tf.summary.scalar("s2s_loss", s2s_loss)
         tf.summary.scalar("learning_rate", learning_rate)
 
         # Create optimizer
@@ -437,6 +442,9 @@ def main(args):
                 {
                     "step": global_step,
                     "loss": loss,
+                    "adv_loss": adv_loss,
+                    "s2s_loss": s2s_loss,
+                    "learn_rate": learning_rate,
                     "source": tf.shape(features["source"]),
                     "target": tf.shape(features["target"])
                 },
