@@ -117,7 +117,7 @@ def get_training_input(filenames, params):
         # Append <eos> symbol
         dataset = dataset.map(
             lambda src, tgt, dom: (
-                tf.concat([src, [tf.constant(params.eos)]], axis=0),
+                tf.concat([[tf.constant(params.dom)], src, [tf.constant(params.eos)]], axis=0),
                 tf.concat([tgt, [tf.constant(params.eos)]], axis=0),
                 dom
             ),

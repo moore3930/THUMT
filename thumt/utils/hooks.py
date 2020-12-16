@@ -8,6 +8,7 @@ from __future__ import print_function
 import datetime
 import operator
 import os
+import numpy as np
 
 import tensorflow as tf
 import thumt.utils.bleu as bleu
@@ -138,6 +139,7 @@ def _evaluate(eval_fn, input_fn, decode_fn, path, config):
         placeholders = {
             "source": tf.placeholder(tf.int32, [None, None], "source"),
             "source_length": tf.placeholder(tf.int32, [None], "source_length")
+            # "domain_label": tf.placeholder(tf.int32, [None], "domain_label")
         }
         predictions = eval_fn(placeholders)
         predictions = predictions[0][:, 0, :]
@@ -156,6 +158,7 @@ def _evaluate(eval_fn, input_fn, decode_fn, path, config):
                 outputs = sess.run(predictions, feed_dict={
                     placeholders["source"]: feats["source"],
                     placeholders["source_length"]: feats["source_length"]
+                    # placeholders["domain_label"]: np.ones_like(feats["source_length"])
                 })
                 # shape: [batch, len]
                 outputs = outputs.tolist()

@@ -225,7 +225,9 @@ def decoding_graph(features, state, mode, params):
 
     dtype = tf.get_variable_scope().dtype
 
-    domain_label = features["domain_label"]
+    if mode == "train":
+        domain_label = features["domain_label"]
+
     tgt_seq = features["target"]
     src_len = features["source_length"]
     tgt_len = features["target_length"]
@@ -312,7 +314,8 @@ def decoding_graph(features, state, mode, params):
 
     ce = tf.reshape(ce, tf.shape(tgt_seq))                  # [?, max_len]
 
-    tgt_mask = tf.expand_dims(tf.cast(domain_label, dtype=tf.float32), 1) * tgt_mask
+    if mode == "train":
+        tgt_mask = tf.expand_dims(tf.cast(domain_label, dtype=tf.float32), 1) * tgt_mask
 
     if mode == "eval":
         return -tf.reduce_sum(ce * tgt_mask, axis=1)
@@ -452,8 +455,7 @@ class Transformer(NMTModel):
                 params = copy.copy(params)
 
             with tf.variable_scope(self._scope):
-                log_prob, new_state = decoding_graph(features, state, "infer",
-                                                     params)
+                log_prob, new_state = decoding_graph(features, state, "infer", params)
 
             return log_prob, new_state
 
@@ -467,6 +469,7 @@ class Transformer(NMTModel):
     def get_parameters():
         params = tf.contrib.training.HParams(
             pad="<pad>",
+            dom="<dom>",
             bos="<eos>",
             eos="<eos>",
             unk="<unk>",

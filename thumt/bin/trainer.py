@@ -71,7 +71,7 @@ def default_parameters():
         max_length=256,
         length_multiplier=1,
         mantissa_bits=2,
-        warmup_steps=4000,
+        warmup_steps=40,
         train_steps=100000,
         buffer_size=10000,
         constant_batch_size=False,
@@ -91,10 +91,10 @@ def default_parameters():
         learning_rate_decay="linear_warmup_rsqrt_decay",
         learning_rate_boundaries=[0],
         learning_rate_values=[0.0],
-        keep_checkpoint_max=20,
+        keep_checkpoint_max=200,
         keep_top_checkpoint_max=5,
         # Validation
-        eval_steps=2000,
+        eval_steps=200,
         eval_secs=0,
         eval_batch_size=32,
         top_beams=1,
@@ -367,6 +367,7 @@ def main(args):
         regularizer = tf.contrib.layers.l1_l2_regularizer(
             scale_l1=params.scale_l1, scale_l2=params.scale_l2)
         model = model_cls(params)
+
         # Create global step
         global_step = tf.train.get_or_create_global_step()
         dtype = tf.float16 if args.half else None
